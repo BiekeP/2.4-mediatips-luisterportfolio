@@ -525,7 +525,7 @@
     </div>
     <div id="noAudioMsg" style="display:none; text-align:center; margin-top:20px; padding:16px 20px; background:rgba(255,201,74,0.08); border:1px solid rgba(255,201,74,0.25); border-radius:14px; color:#ffc94a; font-size:0.88rem; line-height:1.6;">
       🎧 Voor jouw gekozen genre(s) zijn er momenteel geen podcasts of radioprogramma's beschikbaar.<br>
-      <span style="color:var(--muted)">Kies televisie, of ga terug en kies een ander genre.</span>
+      <span style="color:var(--muted)">📺 Televisie is automatisch geselecteerd — klik gerust op "Toon mijn tips"!</span>
     </div>
     <div class="btn-row">
       <button class="btn btn-ghost" onclick="goToScreen1()">← Terug</button>
@@ -891,6 +891,7 @@ const programs = [
     name: "Alles Goed?",
     type: "podcast",
     genres: ["human interest", "actualiteit"],
+    icon: "🌱",
     iconBg: "rgba(74,240,200,0.12)",
     platform: "VRT / Podcast",
     desc: "Over mentale gezondheid, stress, gelukkig zijn. Echte gesprekken met mensen over hoe het met hen gaat.",
@@ -931,19 +932,25 @@ function goToScreen1() {
 function goToScreen2() {
   if (selectedGenres.size === 0) { alert('Kies minstens één categorie!'); return; }
 
-  // Toon of verberg de podcastkaart naargelang er podcasts zijn voor de gekozen genres
   const hasPodcasts = programs.some(p =>
     p.type === 'podcast' && [...selectedGenres].some(g => p.genres.includes(g))
   );
   const podcastCard = document.getElementById('podcastCard');
+  const tvCard = document.getElementById('tvCard');
   const noAudioMsg = document.getElementById('noAudioMsg');
+
   podcastCard.style.display = hasPodcasts ? '' : 'none';
   noAudioMsg.style.display = hasPodcasts ? 'none' : '';
 
-  // Als podcast verborgen is en momenteel geselecteerd, reset de selectie
-  if (!hasPodcasts && selectedMedia === 'podcast') {
-    selectedMedia = null;
+  if (!hasPodcasts) {
+    // Automatisch televisie selecteren
+    selectedMedia = 'tv';
+    tvCard.classList.add('selected-tv');
+  } else {
+    // Reset selectie bij terugkeer
+    tvCard.classList.remove('selected-tv');
     podcastCard.classList.remove('selected-podcast');
+    if (!hasPodcasts && selectedMedia === 'podcast') selectedMedia = null;
   }
 
   showScreen(2, 66);
@@ -1040,44 +1047,46 @@ function buildResults() {
 // ─── PRINT / DOWNLOAD ────────────────────────────────────────────────────────
 
 function printList() {
-  // Build or reuse print container
-  let el = document.getElementById('printContent');
-  if (el) el.remove();
-
-  el = document.createElement('div');
-  el.id = 'printContent';
-
   const now = new Date().toLocaleDateString('nl-BE', { day: 'numeric', month: 'long', year: 'numeric' });
-  el.innerHTML = `<h1>🎓 Kijk & Luister — NT2 Niveau 2.4</h1>
-    <div class="print-sub">Volledig aanbod Nederlandstalige programma's en podcasts • ${now}</div>`;
+  const escape = s => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  // Remove existing overlay if any
+  const existing = document.getElementById('printOverlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'printOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:#fff;color:#111;z-index:9999;overflow-y:auto;padding:40px;font-family:Georgia,serif';
+
+  let inner = `<div style="max-width:800px;margin:0 auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <h1 style="font-size:1.6rem;margin:0">Kijk &amp; Luister — NT2 Niveau 2.4</h1>
+      <div style="display:flex;gap:10px">
+        <button onclick="window.print()" style="padding:8px 18px;background:#ff6b4a;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:.9rem">🖨️ Printen</button>
+        <button onclick="document.getElementById('printOverlay').remove()" style="padding:8px 18px;background:#eee;color:#333;border:none;border-radius:8px;cursor:pointer;font-size:.9rem">✕ Sluiten</button>
+      </div>
+    </div>
+    <div style="font-size:.85rem;color:#666;margin-bottom:28px;border-bottom:2px solid #eee;padding-bottom:12px">Volledig aanbod Nederlandstalige programma's en podcasts &bull; ${now}</div>`;
 
   platformOrder.forEach(plDef => {
     const items = programs.filter(p => getPlatformKey(p) === plDef.key);
     if (!items.length) return;
-
-    const header = document.createElement('div');
-    header.className = 'print-platform';
-    header.textContent = `${plDef.icon}  ${plDef.key}`;
-    el.appendChild(header);
-
+    inner += `<div style="font-size:1.05rem;font-weight:700;margin:22px 0 8px;color:#222;border-left:4px solid #ff6b4a;padding-left:10px">${escape(plDef.icon)} ${escape(plDef.key)}</div>`;
     items.forEach(p => {
-      const row = document.createElement('div');
-      row.className = 'print-row';
-      row.innerHTML = `
-        <div class="print-icon">${p.icon}</div>
+      inner += `<div style="display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #f0f0f0">
+        <div style="font-size:1.4rem;width:32px;flex-shrink:0">${escape(p.icon || '')}</div>
         <div>
-          <div class="print-name">${p.name}</div>
-          <div class="print-tags">${p.genres.join(' · ') || 'lifestyle'} · ${p.platform}</div>
-          <div class="print-desc">${p.desc}</div>
-          <div class="print-link">${p.link}</div>
-        </div>`;
-      el.appendChild(row);
+          <div style="font-weight:700;font-size:.95rem;margin-bottom:3px">${escape(p.name)}</div>
+          <div style="font-size:.72rem;color:#888;margin-bottom:4px">${escape(p.genres.join(' · '))} · ${escape(p.platform)}</div>
+          <div style="font-size:.82rem;color:#444;line-height:1.5;margin-bottom:3px">${escape(p.desc)}</div>
+          <div style="font-size:.75rem;color:#e05a3a;word-break:break-all">${escape(p.link)}</div>
+        </div></div>`;
     });
   });
 
-  el.innerHTML += `<div class="print-footer">Gemaakt voor NT2-cursisten niveau 2.4 · Alle programma's zijn gratis of met gratis account te bekijken of beluisteren.</div>`;
-  document.body.appendChild(el);
-  window.print();
+  inner += `<div style="margin-top:28px;font-size:.75rem;color:#aaa;text-align:center;border-top:1px solid #eee;padding-top:12px">Gemaakt voor NT2-cursisten niveau 2.4 &bull; Alle programma's zijn gratis of met gratis account te bekijken of beluisteren.</div></div>`;
+  overlay.innerHTML = inner;
+  document.body.appendChild(overlay);
 }
 
 
